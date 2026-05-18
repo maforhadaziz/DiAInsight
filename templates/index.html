@@ -1,0 +1,748 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiabetesPred — AI Health Assessment</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Flask static link (works when served via Flask) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Apply saved theme before paint to avoid flash -->
+    <script>if(localStorage.getItem('dp-theme')==='light')document.documentElement.classList.add('light');</script>
+    <style>
+/* ============================================================
+   DiabetesPred — Embedded Styles (fallback for live preview)
+   ============================================================ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+/* ── Dark theme (default) ── */
+:root{
+  --primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;
+  --primary-glow:rgba(99,102,241,0.35);--success:#10b981;--danger:#ef4444;
+  --warning:#f59e0b;--bg:#0f0f1a;--bg-card:#16162a;--bg-input:#1e1e38;
+  --border:rgba(255,255,255,0.08);--text-primary:#f1f5f9;
+  --text-secondary:#94a3b8;--text-muted:#64748b;
+  --radius-sm:8px;--radius-md:14px;--radius-lg:20px;--radius-xl:28px;
+  --shadow-card:0 4px 24px rgba(0,0,0,0.4),0 1px 4px rgba(0,0,0,0.3);
+  --shadow-btn:0 4px 20px var(--primary-glow);
+  --shadow-glow:0 0 40px rgba(99,102,241,0.15);
+  --transition:0.25s cubic-bezier(0.4,0,0.2,1)
+}
+/* ── Light theme ── */
+html.light{
+  --bg:#f0f4ff;--bg-card:#ffffff;--bg-input:#f8f9ff;
+  --border:rgba(0,0,0,0.09);--text-primary:#0f172a;
+  --text-secondary:#475569;--text-muted:#94a3b8;
+  --shadow-card:0 4px 24px rgba(99,102,241,0.1),0 1px 4px rgba(0,0,0,0.06);
+  --shadow-glow:0 0 40px rgba(99,102,241,0.12)
+}
+html.light .navbar{background:rgba(240,244,255,.92)}
+html.light .footer{background:rgba(240,244,255,.9)}
+html.light .blob{opacity:.12}
+html.light .input-wrapper input:hover{background:#eef1ff}
+html.light .input-wrapper input:focus{background:#eef1ff}
+html.light .hero-stats{background:rgba(99,102,241,.06)}
+html.light .btn-ghost{border-color:rgba(0,0,0,.12);color:var(--text-secondary)}
+html.light .btn-ghost:hover{background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.3);color:var(--primary-dark)}
+html.light .step-dot{background:rgba(0,0,0,.12)}
+html.light .confidence-bar{background:rgba(0,0,0,.08)}
+html.light .confidence-block{background:rgba(0,0,0,.04)}
+html.light .result-card.positive{background:linear-gradient(135deg,rgba(239,68,68,.08),rgba(220,38,38,.05))}
+html.light .result-card.negative{background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.05))}
+html.light .result-card.positive .result-title{color:#dc2626}
+html.light .result-card.negative .result-title{color:#059669}
+html.light .result-card.positive .result-subtitle{color:#b91c1c}
+html.light .result-card.negative .result-subtitle{color:#047857}
+html.light .result-disclaimer{background:rgba(245,158,11,.08);color:#92400e}
+html.light .result-disclaimer strong{color:#78350f}
+html.light .footer-disclaimer{color:#92400e}
+html.light .footer-disclaimer strong{color:#78350f}
+html.light .footer-copy{color:var(--text-muted)}
+html.light ::-webkit-scrollbar-track{background:var(--bg)}
+/* Theme toggle button */
+.theme-toggle{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);transition:background var(--transition),border-color var(--transition),color var(--transition),transform var(--transition);flex-shrink:0}
+.theme-toggle:hover{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.4);color:var(--primary-light);transform:rotate(20deg)}
+.theme-toggle svg{width:18px;height:18px;transition:opacity .2s}
+.icon-moon{display:block}.icon-sun{display:none}
+html.light .icon-moon{display:none}html.light .icon-sun{display:block}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text-primary);line-height:1.6;min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s}
+</style>
+</head>
+<body>
+
+<!-- Animated background blobs -->
+<div class="bg-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+</div>
+
+<!-- Navbar -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="navbar-inner">
+        <div class="brand">
+            <div class="brand-icon" aria-hidden="true">
+                <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="20" cy="20" r="20" fill="rgba(255,255,255,0.15)"/>
+                    <path d="M20 10 C20 10 12 16 12 22 C12 26.4 15.6 30 20 30 C24.4 30 28 26.4 28 22 C28 16 20 10 20 10Z" fill="white" opacity="0.9"/>
+                    <path d="M17 22 L19 24 L23 20" stroke="rgba(99,102,241,0.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <span class="brand-name">DiAInspact</span>
+                <span class="brand-tagline">AI-Powered Health Assessment</span>
+            </div>
+        </div>
+        <div class="navbar-right">
+            <div class="navbar-badge">
+                <span class="badge-dot" aria-hidden="true"></span>
+                ML Model Active
+            </div>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark theme" title="Toggle theme">
+                <!-- Moon icon (shown in dark mode) -->
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                </svg>
+                <!-- Sun icon (shown in light mode) -->
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+    <div class="hero-inner">
+        <div class="hero-pill">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="7" fill="#6366f1"/>
+                <path d="M4 7l2 2 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Powered by Machine Learning
+        </div>
+        <h1 class="hero-title">Diabetes Risk <span class="gradient-text">Prediction</span></h1>
+        <p class="hero-subtitle">Enter your health metrics below and our trained ML model will assess your diabetes risk in seconds.</p>
+        <div class="hero-stats">
+            <div class="stat"><span class="stat-value">7</span><span class="stat-label">Health Metrics</span></div>
+            <div class="stat-divider" aria-hidden="true"></div>
+            <div class="stat"><span class="stat-value">AI</span><span class="stat-label">Powered Analysis</span></div>
+            <div class="stat-divider" aria-hidden="true"></div>
+            <div class="stat"><span class="stat-value">Fast</span><span class="stat-label">Instant Results</span></div>
+        </div>
+    </div>
+</header>
+
+<!-- Main -->
+<main class="main-content" id="main">
+    <div class="card form-card">
+        <div class="card-header">
+            <div class="card-header-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="card-title">Health Assessment Form</h2>
+                <p class="card-subtitle">All fields are required for accurate prediction</p>
+            </div>
+        </div>
+
+        <form id="predictionForm" novalidate>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="pregnancies"><span class="label-icon">🤰</span>Pregnancies</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="pregnancies" name="pregnancies" min="0" step="1" required placeholder="e.g. 2">
+                        <span class="input-unit">count</span>
+                    </div>
+                    <span class="field-hint">Number of times pregnant</span>
+                </div>
+                <div class="form-group">
+                    <label for="glucose"><span class="label-icon">🩸</span>Glucose</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="glucose" name="glucose" min="0" step="0.1" required placeholder="e.g. 120">
+                        <span class="input-unit">mg/dL</span>
+                    </div>
+                    <span class="field-hint">Plasma glucose concentration</span>
+                </div>
+                <div class="form-group">
+                    <label for="blood_pressure"><span class="label-icon">💓</span>Blood Pressure</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="blood_pressure" name="blood_pressure" min="0" step="0.1" required placeholder="e.g. 80">
+                        <span class="input-unit">mmHg</span>
+                    </div>
+                    <span class="field-hint">Diastolic blood pressure</span>
+                </div>
+                <div class="form-group">
+                    <label for="skin_thickness"><span class="label-icon">📏</span>Skin Thickness</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="skin_thickness" name="skin_thickness" min="0" step="0.1" required placeholder="e.g. 20">
+                        <span class="input-unit">mm</span>
+                    </div>
+                    <span class="field-hint">Triceps skin fold thickness</span>
+                </div>
+                <div class="form-group">
+                    <label for="insulin"><span class="label-icon">💉</span>Insulin</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="insulin" name="insulin" min="0" step="0.1" required placeholder="e.g. 79">
+                        <span class="input-unit">μU/mL</span>
+                    </div>
+                    <span class="field-hint">2-hour serum insulin</span>
+                </div>
+                <div class="form-group">
+                    <label for="bmi"><span class="label-icon">⚖️</span>BMI</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="bmi" name="bmi" min="0" step="0.1" required placeholder="e.g. 25.0">
+                        <span class="input-unit">kg/m²</span>
+                    </div>
+                    <span class="field-hint">Body mass index</span>
+                </div>
+                <div class="form-group">
+                    <label for="age"><span class="label-icon">🎂</span>Age</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="age" name="age" min="0" max="150" step="1" required placeholder="e.g. 30">
+                        <span class="input-unit">years</span>
+                    </div>
+                    <span class="field-hint">Age in years</span>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <span class="btn-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    <span class="btn-text">Analyze Health Data</span>
+                    <span class="btn-shine" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="btn btn-ghost" onclick="clearForm()">
+                    <span class="btn-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    Clear Form
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="card loading-card hidden" role="status" aria-live="polite">
+        <div class="loading-animation">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring pulse-ring-2"></div>
+            <div class="pulse-core">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+        </div>
+        <h3 class="loading-title">Analyzing Your Data</h3>
+        <p class="loading-subtitle">Our ML model is processing your health metrics…</p>
+        <div class="loading-steps">
+            <div class="step active" id="step1"><div class="step-dot"></div><span>Validating inputs</span></div>
+            <div class="step" id="step2"><div class="step-dot"></div><span>Running prediction</span></div>
+            <div class="step" id="step3"><div class="step-dot"></div><span>Generating report</span></div>
+        </div>
+    </div>
+
+    <!-- Result -->
+    <div id="resultSection" class="hidden" role="region" aria-live="polite">
+        <div id="result"></div>
+        <div class="result-actions">
+            <button type="button" class="btn btn-primary" onclick="resetForm()">
+                <span class="btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="btn-text">New Assessment</span>
+                <span class="btn-shine" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="window.print()">
+                <span class="btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                Print Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Error -->
+    <div id="errorSection" class="card error-card hidden" role="alert">
+        <div class="error-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <div class="error-content">
+            <h3 class="error-title">Something went wrong</h3>
+            <p id="errorMessage" class="error-message"></p>
+        </div>
+        <button type="button" class="btn btn-danger-outline" onclick="resetForm()">Try Again</button>
+    </div>
+</main>
+
+<!-- Footer -->
+<footer class="footer">
+    <div class="footer-inner">
+        <div class="footer-disclaimer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p><strong>Medical Disclaimer:</strong> This tool is for educational and research purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider.</p>
+        </div>
+        <p class="footer-copy">&copy; 2025 DiabetesPred &mdash; ML Thesis Project</p>
+    </div>
+</footer>
+
+<style>
+/* ── Background Blobs ── */
+.bg-blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.18;animation:blobFloat 12s ease-in-out infinite alternate}
+.blob-1{width:520px;height:520px;background:radial-gradient(circle,#6366f1,#4f46e5);top:-160px;left:-160px;animation-duration:14s}
+.blob-2{width:420px;height:420px;background:radial-gradient(circle,#8b5cf6,#6366f1);bottom:-120px;right:-120px;animation-duration:10s;animation-delay:-4s}
+.blob-3{width:320px;height:320px;background:radial-gradient(circle,#06b6d4,#6366f1);top:50%;left:50%;transform:translate(-50%,-50%);animation-duration:16s;animation-delay:-8s}
+@keyframes blobFloat{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.08)}}
+
+/* ── Navbar ── */
+.navbar{position:sticky;top:0;z-index:200;background:rgba(15,15,26,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.navbar-inner{max-width:1100px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:14px}
+.brand-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px var(--primary-glow);flex-shrink:0}
+.brand-icon svg{width:26px;height:26px}
+.brand-text{display:flex;flex-direction:column}
+.brand-name{font-size:18px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px;line-height:1.2}
+.brand-tagline{font-size:11px;color:var(--text-muted);font-weight:500;letter-spacing:.3px}
+.navbar-badge{display:flex;align-items:center;gap:7px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25);color:#34d399;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px}
+.navbar-right{display:flex;align-items:center;gap:10px}
+.badge-dot{width:7px;height:7px;background:#10b981;border-radius:50%;animation:pulseDot 2s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+/* ── Hero ── */
+.hero{position:relative;z-index:1;text-align:center;padding:72px 24px 48px}
+.hero-inner{max-width:680px;margin:0 auto}
+.hero-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);color:var(--primary-light);font-size:13px;font-weight:600;padding:6px 16px;border-radius:999px;margin-bottom:24px;letter-spacing:.3px}
+.hero-title{font-size:clamp(32px,5vw,52px);font-weight:800;line-height:1.15;letter-spacing:-1.5px;color:var(--text-primary);margin-bottom:18px}
+.gradient-text{background:linear-gradient(135deg,var(--primary-light) 0%,#a78bfa 50%,#38bdf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-subtitle{font-size:17px;color:var(--text-secondary);max-width:520px;margin:0 auto 36px;line-height:1.7}
+.hero-stats{display:inline-flex;align-items:center;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 32px;gap:32px}
+.stat{text-align:center}
+.stat-value{display:block;font-size:22px;font-weight:800;color:var(--primary-light);letter-spacing:-.5px;line-height:1.1}
+.stat-label{display:block;font-size:11px;color:var(--text-muted);font-weight:500;margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+.stat-divider{width:1px;height:36px;background:var(--border)}
+
+/* ── Main ── */
+.main-content{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:0 24px 80px}
+
+/* ── Card ── */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xl);box-shadow:var(--shadow-card);margin-bottom:24px;transition:box-shadow var(--transition),border-color var(--transition)}
+.card:hover{border-color:rgba(99,102,241,.2);box-shadow:var(--shadow-card),var(--shadow-glow)}
+.form-card{padding:40px}
+.card-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:36px;padding-bottom:28px;border-bottom:1px solid var(--border)}
+.card-header-icon{width:48px;height:48px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.2));border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--primary-light);flex-shrink:0}
+.card-title{font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px;margin-bottom:4px}
+.card-subtitle{font-size:14px;color:var(--text-muted)}
+
+/* ── Form ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px;margin-bottom:32px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-secondary);letter-spacing:.2px;cursor:pointer;transition:color var(--transition)}
+.form-group:focus-within label{color:var(--primary-light)}
+.label-icon{font-size:15px;line-height:1}
+.input-wrapper{position:relative;display:flex;align-items:center}
+.input-wrapper input{width:100%;padding:12px 52px 12px 16px;background:var(--bg-input);border:1.5px solid rgba(255,255,255,.08);border-radius:var(--radius-sm);font-size:15px;font-family:inherit;font-weight:500;color:var(--text-primary);transition:border-color var(--transition),box-shadow var(--transition),background var(--transition);-moz-appearance:textfield}
+.input-wrapper input::-webkit-outer-spin-button,.input-wrapper input::-webkit-inner-spin-button{-webkit-appearance:none}
+.input-wrapper input::placeholder{color:var(--text-muted);font-weight:400}
+.input-wrapper input:hover{border-color:rgba(99,102,241,.35);background:rgba(30,30,60,.9)}
+.input-wrapper input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.18);background:rgba(30,30,60,1)}
+.input-wrapper input.error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(239,68,68,.15)}
+.input-unit{position:absolute;right:14px;font-size:11px;font-weight:600;color:var(--text-muted);pointer-events:none;letter-spacing:.3px;text-transform:uppercase}
+.field-hint{font-size:11.5px;color:var(--text-muted);line-height:1.4}
+.form-actions{display:flex;gap:12px;align-items:center}
+</style>
+
+<style>
+/* ── Buttons ── */
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 28px;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),background var(--transition),border-color var(--transition),color var(--transition);overflow:hidden;letter-spacing:.2px;white-space:nowrap}
+.btn:focus-visible{outline:2px solid var(--primary-light);outline-offset:3px}
+.btn:active{transform:scale(.97)!important}
+.btn-primary{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);color:#fff;box-shadow:var(--shadow-btn);flex:1}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 8px 30px var(--primary-glow);background:linear-gradient(135deg,var(--primary-light) 0%,var(--primary) 100%)}
+.btn-shine{position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);transform:skewX(-20deg);transition:left .5s ease;pointer-events:none}
+.btn-primary:hover .btn-shine{left:160%}
+.btn-ghost{background:transparent;color:var(--text-secondary);border:1.5px solid var(--border);padding:12px 22px}
+.btn-ghost:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.18);color:var(--text-primary);transform:translateY(-2px)}
+.btn-danger-outline{background:transparent;color:var(--danger);border:1.5px solid rgba(239,68,68,.4);padding:10px 22px;font-size:14px}
+.btn-danger-outline:hover{background:rgba(239,68,68,.1);border-color:var(--danger);transform:translateY(-2px)}
+.btn-icon{display:flex;align-items:center;flex-shrink:0}
+
+/* ── Loading ── */
+.loading-card{padding:60px 40px;text-align:center}
+.loading-animation{position:relative;width:80px;height:80px;margin:0 auto 28px}
+.pulse-ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--primary);animation:pulseRing 1.8s ease-out infinite}
+.pulse-ring-2{animation-delay:.6s}
+@keyframes pulseRing{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.4);opacity:0}}
+.pulse-core{position:absolute;inset:14px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px var(--primary-glow)}
+.loading-title{font-size:20px;font-weight:700;color:var(--text-primary);margin-bottom:8px}
+.loading-subtitle{font-size:14px;color:var(--text-muted);margin-bottom:32px}
+.loading-steps{display:flex;justify-content:center;gap:32px}
+.step{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);font-weight:500;transition:color var(--transition)}
+.step.active{color:var(--primary-light)}
+.step.done{color:var(--success)}
+.step-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.1);transition:background var(--transition),box-shadow var(--transition)}
+.step.active .step-dot{background:var(--primary);box-shadow:0 0 10px var(--primary-glow);animation:pulseDot 1.2s ease-in-out infinite}
+.step.done .step-dot{background:var(--success)}
+
+/* ── Result ── */
+.result-card{border-radius:var(--radius-xl);padding:44px;text-align:center;margin-bottom:20px;position:relative;overflow:hidden;border:1px solid transparent;animation:resultReveal .5s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes resultReveal{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.result-card.positive{background:linear-gradient(135deg,rgba(239,68,68,.12) 0%,rgba(220,38,38,.08) 100%);border-color:rgba(239,68,68,.25)}
+.result-card.negative{background:linear-gradient(135deg,rgba(16,185,129,.12) 0%,rgba(5,150,105,.08) 100%);border-color:rgba(16,185,129,.25)}
+.result-emoji{font-size:56px;line-height:1;margin-bottom:16px;display:block;animation:bounceIn .6s cubic-bezier(.34,1.56,.64,1) .2s both}
+@keyframes bounceIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.result-title{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px}
+.result-card.positive .result-title{color:#fca5a5}
+.result-card.negative .result-title{color:#6ee7b7}
+.result-subtitle{font-size:15px;margin-bottom:28px;opacity:.75}
+.result-card.positive .result-subtitle{color:#fca5a5}
+.result-card.negative .result-subtitle{color:#6ee7b7}
+.confidence-block{background:rgba(0,0,0,.2);border-radius:var(--radius-md);padding:20px 24px;margin-bottom:20px;text-align:left}
+.confidence-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.confidence-label{font-size:13px;font-weight:600;opacity:.8;text-transform:uppercase;letter-spacing:.5px}
+.confidence-value{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.confidence-bar{height:8px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden}
+.confidence-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.34,1.56,.64,1);width:0}
+.result-card.positive .confidence-fill{background:linear-gradient(90deg,#f87171,#ef4444)}
+.result-card.negative .confidence-fill{background:linear-gradient(90deg,#34d399,#10b981)}
+.result-disclaimer{display:flex;align-items:flex-start;gap:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius-sm);padding:14px 16px;text-align:left;font-size:13px;color:#fcd34d;line-height:1.5}
+.result-disclaimer svg{flex-shrink:0;margin-top:1px}
+.result-actions{display:flex;gap:12px;margin-bottom:24px}
+.result-actions .btn-primary{flex:1}
+
+/* ── Error ── */
+.error-card{padding:28px 32px;display:flex;align-items:center;gap:20px;border-left:3px solid var(--danger)}
+.error-icon{width:52px;height:52px;background:rgba(239,68,68,.12);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--danger);flex-shrink:0}
+.error-content{flex:1}
+.error-title{font-size:16px;font-weight:700;color:var(--danger);margin-bottom:4px}
+.error-message{font-size:14px;color:var(--text-secondary)}
+
+/* ── Footer ── */
+.footer{position:relative;z-index:1;border-top:1px solid var(--border);background:rgba(15,15,26,.8);backdrop-filter:blur(10px);padding:32px 24px;text-align:center}
+.footer-inner{max-width:700px;margin:0 auto}
+.footer-disclaimer{display:flex;align-items:flex-start;gap:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:16px;text-align:left;font-size:13px;color:#fcd34d;line-height:1.6}
+.footer-disclaimer svg{flex-shrink:0;margin-top:2px;color:var(--warning)}
+.footer-disclaimer strong{color:#fbbf24}
+.footer-copy{font-size:13px;color:var(--text-muted)}
+
+/* ── Utility ── */
+.hidden{display:none!important}
+
+/* ── Tips Section ── */
+.tips-section{margin-top:24px}
+.tips-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:20px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.tips-icon{font-size:28px;line-height:1}
+.tips-title{font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:3px}
+.tips-sub{font-size:13px;color:var(--text-muted)}
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.tip-card{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid #6366f1;border-radius:var(--radius-md);padding:16px 18px;transition:transform var(--transition),box-shadow var(--transition)}
+.tip-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card)}
+.tip-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.tip-icon{font-size:18px;line-height:1}
+.tip-cat{font-size:13px;font-weight:700;color:var(--text-primary);flex:1}
+.tip-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.3px;text-transform:uppercase}
+.tip-text{font-size:13px;color:var(--text-secondary);line-height:1.6}
+html.light .tips-header{background:#fff}
+html.light .tip-card{background:#fff}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:rgba(99,102,241,.4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--primary)}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .hero{padding:48px 20px 36px}
+  .hero-stats{gap:20px;padding:14px 24px}
+  .form-card{padding:28px 20px}
+  .form-grid{grid-template-columns:1fr 1fr;gap:16px}
+  .form-actions{flex-direction:column}
+  .btn-primary{width:100%}
+  .result-card{padding:32px 24px}
+  .result-title{font-size:22px}
+  .result-emoji{font-size:44px}
+  .result-actions{flex-direction:column}
+  .error-card{flex-direction:column;text-align:center}
+  .loading-steps{gap:20px}
+  .navbar-badge{display:none}
+}
+@media(max-width:480px){
+  .hero-title{font-size:28px}
+  .hero-stats{flex-direction:column;gap:12px}
+  .stat-divider{width:40px;height:1px}
+  .form-grid{grid-template-columns:1fr}
+  .form-card{padding:20px 16px}
+  .loading-card{padding:40px 20px}
+  .loading-steps{flex-direction:column;align-items:center;gap:12px}
+}
+@media print{
+  .bg-blobs,.navbar,.hero,.form-card,.result-actions,.footer{display:none!important}
+  body{background:#fff;color:#000}
+  .result-card{border:2px solid #ccc!important;background:#fff!important}
+  .result-title,.result-subtitle{color:#000!important}
+}
+</style>
+
+
+<script>
+(function(){
+  if(window.__dpLoaded) return;
+  window.__dpLoaded = true;
+
+  // Theme toggle
+  (function(){
+    var html=document.documentElement,btn=document.getElementById('themeToggle');
+    if(localStorage.getItem('dp-theme')==='light') html.classList.add('light');
+    if(btn) btn.addEventListener('click',function(){
+      html.classList.toggle('light');
+      localStorage.setItem('dp-theme',html.classList.contains('light')?'light':'dark');
+    });
+  })();
+
+  document.addEventListener('DOMContentLoaded',function(){
+    var form=document.getElementById('predictionForm');
+    if(!form) return;
+    form.addEventListener('submit',handleSubmit);
+    form.querySelectorAll('input[required]').forEach(function(inp){
+      inp.addEventListener('input',function(){
+        inp.classList.remove('error');
+        document.getElementById('errorSection').classList.add('hidden');
+      });
+    });
+  });
+
+  async function handleSubmit(e){
+    e.preventDefault();
+    if(!validate()) return;
+    var data=Object.fromEntries(new FormData(e.target));
+    showLoading();
+    try {
+      await animateSteps();
+      var res=await fetch('/predict',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data)
+      });
+      var json;
+      try{ json=await res.json(); }
+      catch(pe){
+        throw new Error('Flask server is not running. Please run: python app.py — then open http://localhost:5000');
+      }
+      if(!res.ok) throw new Error(json.error||'Prediction failed.');
+      showResult(json);
+    } catch(err){ showError(err.message); }
+    finally{ hideLoading(); }
+  }
+
+  function animateSteps(){
+    return new Promise(function(resolve){
+      var ids=['step1','step2','step3'],i=0;
+      ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.className='step'; });
+      function tick(){
+        if(i>0){ var p=document.getElementById(ids[i-1]); if(p) p.className='step done'; }
+        if(i<ids.length){ var c=document.getElementById(ids[i]); if(c) c.className='step active'; i++; setTimeout(tick,550); }
+        else resolve();
+      }
+      tick();
+    });
+  }
+
+  function validate(){
+    var inputs=document.getElementById('predictionForm').querySelectorAll('input[required]');
+    var ok=true;
+    inputs.forEach(function(inp){
+      var v=parseFloat(inp.value);
+      if(inp.value.trim()===''||isNaN(v)||v<0){ inp.classList.add('error'); ok=false; }
+      else inp.classList.remove('error');
+    });
+    if(!ok) showError('Please fill in all fields with valid non-negative values.');
+    return ok;
+  }
+
+  // ── Personalised Health Tips (ADA / WHO clinical thresholds) ──
+  function buildTips(inp, isPositive){
+    var tips=[];
+    var g=+inp.glucose, bp=+inp.blood_pressure, bmi=+inp.bmi,
+        age=+inp.age, ins=+inp.insulin, sk=+inp.skin_thickness, preg=+inp.pregnancies;
+
+    // Glucose
+    if(g>=126)       tips.push({icon:'🩸',cat:'Glucose',lvl:'high',
+      text:'Fasting glucose '+g+' mg/dL is in the diabetic range (≥126 mg/dL per ADA). Discuss an HbA1c test with your doctor immediately. Eliminate sugary drinks, white bread, and processed carbs.'});
+    else if(g>=100)  tips.push({icon:'🩸',cat:'Glucose',lvl:'warn',
+      text:'Glucose '+g+' mg/dL is pre-diabetic (100–125 mg/dL). Reduce refined carbohydrates, increase dietary fibre, and aim for 150 min of moderate exercise per week to prevent progression.'});
+    else             tips.push({icon:'🩸',cat:'Glucose',lvl:'good',
+      text:'Glucose '+g+' mg/dL is normal (<100 mg/dL). Maintain it by choosing whole grains, vegetables, and limiting added sugars to <25 g/day (WHO guideline).'});
+
+    // Blood Pressure
+    if(bp>=90)       tips.push({icon:'💓',cat:'Blood Pressure',lvl:'high',
+      text:'Diastolic BP '+bp+' mmHg is Stage 2 hypertension. Reduce sodium to <1500 mg/day, avoid alcohol, exercise daily, and consult your doctor — medication may be needed.'});
+    else if(bp>=80)  tips.push({icon:'💓',cat:'Blood Pressure',lvl:'warn',
+      text:'Diastolic BP '+bp+' mmHg is elevated. Follow the DASH diet (fruits, vegetables, low-fat dairy, whole grains) and reduce processed food and caffeine.'});
+    else             tips.push({icon:'💓',cat:'Blood Pressure',lvl:'good',
+      text:'Blood pressure ('+bp+' mmHg diastolic) is healthy. Keep it up with regular aerobic activity and a low-sodium diet.'});
+
+    // BMI
+    if(bmi>=30)      tips.push({icon:'⚖️',cat:'BMI',lvl:'high',
+      text:'BMI '+bmi.toFixed(1)+' is obese (≥30). Even a 5–10% weight reduction significantly lowers diabetes risk. Target a 500 kcal/day deficit through diet and exercise combined.'});
+    else if(bmi>=25) tips.push({icon:'⚖️',cat:'BMI',lvl:'warn',
+      text:'BMI '+bmi.toFixed(1)+' is overweight (25–29.9). Focus on portion control, increase fibre intake, and add 30 min of brisk walking daily to reach a healthy BMI of 18.5–24.9.'});
+    else             tips.push({icon:'⚖️',cat:'BMI',lvl:'good',
+      text:'BMI '+bmi.toFixed(1)+' is in the healthy range (18.5–24.9). Maintain it with regular physical activity and a nutrient-dense, balanced diet.'});
+
+    // Insulin
+    if(ins>166)      tips.push({icon:'💉',cat:'Insulin',lvl:'high',
+      text:'Insulin '+ins+' μU/mL is very high, strongly suggesting insulin resistance. Avoid high-glycaemic foods, increase physical activity, and discuss treatment options with your doctor.'});
+    else if(ins>25)  tips.push({icon:'💉',cat:'Insulin',lvl:'warn',
+      text:'Insulin '+ins+' μU/mL is above the normal fasting range (2–25 μU/mL). Reduce refined carbs, increase soluble fibre (oats, legumes, vegetables), and exercise regularly.'});
+    else if(ins>0)   tips.push({icon:'💉',cat:'Insulin',lvl:'good',
+      text:'Insulin '+ins+' μU/mL is within the normal fasting range. Maintain insulin sensitivity with regular exercise and a low-glycaemic diet.'});
+
+    // Skin Thickness (body fat proxy)
+    if(sk>=35)       tips.push({icon:'📏',cat:'Body Fat',lvl:'warn',
+      text:'Triceps skinfold '+sk+' mm suggests higher body fat. Add strength training 2–3×/week alongside cardio — muscle mass improves insulin sensitivity and glucose uptake.'});
+
+    // Age
+    if(age>=45)      tips.push({icon:'🎂',cat:'Age Risk',lvl:'warn',
+      text:'At age '+age+', diabetes risk increases. The ADA recommends screening every 3 years from age 45. Annual HbA1c checks are advisable if you have additional risk factors.'});
+
+    // Pregnancies
+    if(preg>=4)      tips.push({icon:'🤰',cat:'Pregnancy History',lvl:'warn',
+      text:preg+' pregnancies raises gestational diabetes history risk. Maintain a healthy weight, monitor glucose regularly, and discuss screening frequency with your doctor.'});
+
+    // Outcome-specific action tips
+    if(isPositive){
+      tips.push({icon:'🥗',cat:'Diet Plan',lvl:'action',
+        text:'Follow a diabetes-friendly plate: ½ non-starchy vegetables, ¼ lean protein, ¼ whole grains. Avoid sugary beverages entirely. Limit total carbs to 45–60 g per meal (ADA recommendation).'});
+      tips.push({icon:'🏃',cat:'Exercise',lvl:'action',
+        text:'ADA recommends 150 min/week of moderate aerobic activity plus 2 resistance training sessions. Start with 10-min walks after each meal — this alone reduces post-meal glucose spikes.'});
+      tips.push({icon:'🩺',cat:'See a Doctor',lvl:'action',
+        text:'Schedule an HbA1c test. HbA1c ≥6.5% confirms diabetes. Early treatment prevents complications: neuropathy, retinopathy, nephropathy, and cardiovascular disease.'});
+    } else {
+      tips.push({icon:'🥗',cat:'Prevention Diet',lvl:'action',
+        text:'The Mediterranean diet reduces diabetes risk by up to 30% (NEJM study). Focus on olive oil, fish, legumes, whole grains, fruits, and vegetables. Limit red meat and processed foods.'});
+      tips.push({icon:'🏃',cat:'Stay Active',lvl:'action',
+        text:'Regular physical activity improves insulin sensitivity. Aim for 30 min of moderate exercise 5 days/week. Even daily walking significantly reduces long-term diabetes risk.'});
+    }
+    return tips;
+  }
+
+  function renderTips(tips){
+    var colors={high:'#ef4444',warn:'#f59e0b',good:'#10b981',action:'#6366f1'};
+    var labels={high:'High Risk',warn:'Caution',good:'Healthy',action:'Action'};
+    return tips.map(function(t){
+      var c=colors[t.lvl]||'#6366f1', l=labels[t.lvl]||'Tip';
+      return '<div class="tip-card" style="border-left-color:'+c+'">'+
+        '<div class="tip-header">'+
+          '<span class="tip-icon">'+t.icon+'</span>'+
+          '<span class="tip-cat">'+t.cat+'</span>'+
+          '<span class="tip-badge" style="background:'+c+'22;color:'+c+'">'+l+'</span>'+
+        '</div>'+
+        '<p class="tip-text">'+t.text+'</p>'+
+      '</div>';
+    }).join('');
+  }
+
+  function showResult(r){
+    var pos=r.prediction===1;
+    var cls=pos?'positive':'negative';
+    var emoji=pos?'⚠️':'✅';
+    var title=r.prediction_text||(pos?'Diabetes Detected':'No Diabetes Detected');
+    var sub=pos?'Your health data indicates elevated diabetes risk.':'Your health data shows no significant diabetes risk.';
+
+    var confHTML='';
+    if(r.confidence!=null){
+      var pct=Math.round(r.confidence);
+      confHTML='<div class="confidence-block">'+
+        '<div class="confidence-header"><span class="confidence-label">Model Confidence</span><span class="confidence-value">'+pct+'%</span></div>'+
+        '<div class="confidence-bar"><div class="confidence-fill" id="confFill" style="width:0%"></div></div>'+
+      '</div>';
+    }
+
+    var tipsHTML='';
+    if(r.inputs){
+      tipsHTML='<div class="tips-section">'+
+        '<div class="tips-header">'+
+          '<span class="tips-icon">💡</span>'+
+          '<div><h3 class="tips-title">Personalised Health Tips</h3>'+
+          '<p class="tips-sub">Based on your submitted health values</p></div>'+
+        '</div>'+
+        '<div class="tips-grid">'+renderTips(buildTips(r.inputs,pos))+'</div>'+
+      '</div>';
+    }
+
+    document.getElementById('result').innerHTML=
+      '<div class="result-card '+cls+'">'+
+        '<span class="result-emoji">'+emoji+'</span>'+
+        '<h2 class="result-title">'+title+'</h2>'+
+        '<p class="result-subtitle">'+sub+'</p>'+
+        confHTML+
+        '<div class="result-disclaimer">'+
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+          '<span><strong>Important:</strong> This is for educational purposes only and is not a medical diagnosis. Please consult a qualified healthcare professional.</span>'+
+        '</div>'+
+      '</div>'+
+      tipsHTML;
+
+    document.getElementById('errorSection').classList.add('hidden');
+    document.getElementById('predictionForm').closest('.form-card').style.display='none';
+    var rs=document.getElementById('resultSection');
+    rs.classList.remove('hidden');
+    rs.scrollIntoView({behavior:'smooth',block:'start'});
+
+    if(r.confidence!=null){
+      requestAnimationFrame(function(){
+        setTimeout(function(){ var f=document.getElementById('confFill'); if(f) f.style.width=Math.round(r.confidence)+'%'; },120);
+      });
+    }
+  }
+
+  function showLoading(){
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('resultSection').classList.add('hidden');
+    document.getElementById('errorSection').classList.add('hidden');
+  }
+  function hideLoading(){ document.getElementById('loading').classList.add('hidden'); }
+
+  function showError(msg){
+    document.getElementById('errorMessage').textContent=msg;
+    document.getElementById('errorSection').classList.remove('hidden');
+    document.getElementById('resultSection').classList.add('hidden');
+    document.getElementById('errorSection').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  window.resetForm=function(){
+    var form=document.getElementById('predictionForm');
+    form.reset();
+    form.querySelectorAll('input').forEach(function(i){ i.classList.remove('error'); });
+    ['resultSection','errorSection','loading'].forEach(function(id){ document.getElementById(id).classList.add('hidden'); });
+    var fc=form.closest('.form-card');
+    if(fc){ fc.style.display=''; fc.scrollIntoView({behavior:'smooth',block:'start'}); }
+  };
+
+  window.clearForm=function(){
+    var form=document.getElementById('predictionForm');
+    form.reset();
+    form.querySelectorAll('input').forEach(function(i){ i.classList.remove('error'); });
+    document.getElementById('errorSection').classList.add('hidden');
+  };
+})();
+</script>
+</body>
+</html>
