@@ -10,6 +10,17 @@ app = Flask(__name__)
 SCALER_MEAN = np.array([3.845, 120.89, 69.10, 20.54, 79.80, 31.99, 33.24])
 SCALER_STD  = np.array([3.369,  31.97, 19.35, 15.95, 115.24,  7.88, 11.76])
 
+# Features where 0 is medically impossible — replace with column mean
+# (Pregnancies and Age can legitimately be low, so they are excluded)
+# Index: 0=preg, 1=glucose, 2=bp, 3=skin, 4=insulin, 5=bmi, 6=age
+ZERO_REPLACE_MEAN = {
+    1: 120.89,   # Glucose
+    2: 69.10,    # Blood Pressure
+    3: 20.54,    # Skin Thickness
+    4: 79.80,    # Insulin
+    5: 31.99,    # BMI
+}
+
 # Load the trained model
 model_path = 'pickel_model.pkl'
 try:
@@ -44,6 +55,11 @@ def predict():
             float(data.get('bmi', 0)),
             float(data.get('age', 0))
         ]])
+
+        # Replace 0 with column mean for fields where 0 is medically impossible
+        for idx, mean_val in ZERO_REPLACE_MEAN.items():
+            if raw[0][idx] == 0:
+                raw[0][idx] = mean_val
 
         # Scale exactly as done during training
         scaled = (raw - SCALER_MEAN) / SCALER_STD
