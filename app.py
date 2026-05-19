@@ -5,35 +5,48 @@ import os
 
 app = Flask(__name__)
 
-# ── Scaler parameters (Pima Indians Diabetes dataset stats) ──
-# These match exactly what was used when the KNN model was trained in Colab
-SCALER_MEAN = np.array([3.845, 120.89, 69.10, 20.54, 79.80, 31.99, 33.24])
-SCALER_STD  = np.array([3.369,  31.97, 19.35, 15.95, 115.24,  7.88, 11.76])
+# ── Load model bundle (model + scaler saved together from Colab) ──
+# If model_bundle.pkl exists, use it (scaler included — no hardcoded values needed)
+# Falls back to pickel_model.pkl with hardcoded scaler if bundle not found
 
-# Features where 0 is medically impossible — replace with column mean
-# (Pregnancies and Age can legitimately be low, so they are excluded)
-# Index: 0=preg, 1=glucose, 2=bp, 3=skin, 4=insulin, 5=bmi, 6=age
-ZERO_REPLACE_MEAN = {
-    1: 120.89,   # Glucose
-    2: 69.10,    # Blood Pressure
-    3: 20.54,    # Skin Thickness
-    4: 79.80,    # Insulin
-    5: 31.99,    # BMI
-}
+model  = None
+scaler = None
 
-# Load the trained model
-model_path = 'pickel_model.pkl'
-try:
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
-    print(f"Model loaded. Expects {model.n_features_in_} features.")
-except Exception as e:
-    print(f"Error loading model: {e}")
-    model = None
+BUNDLE_PATH = 'model_bundle.pkl'
+LEGACY_PATH = 'pickel_model.pkl'
+
+# Fields where 0 is medically impossible — replaced with column mean
+# Only used in legacy mode (when no scaler is available in the bundle)
+LEGACY_MEAN = np.array([3.845, 120.89, 69.10, 20.54, 79.80, 31.99, 33.24])
+LEGACY_STD  = np.array([3.369,  31.97, 19.35, 15.95, 115.24,  7.88, 11.76])
+LEGACY_ZERO_REPLACE = {1: 120.89, 2: 69.10, 3: 20.54, 4: 79.80, 5: 31.99}
+
+if os.path.exists(BUNDLE_PATH):
+    try:
+        with open(BUNDLE_PATH, 'rb') as f:
+            bundle = pickle.load(f)
+        model  = bundle['model']
+        scaler = bundle['scaler']
+        print(f"Bundle loaded. Model expects {model.n_features_in_} features. Scaler included.")
+    except Exception as e:
+        print(f"Error loading bundle: {e}")
+
+if model is None and os.path.exists(LEGACY_PATH):
+    try:
+        with open(LEGACY_PATH, 'rb') as f:
+            model = pickle.load(f)
+        print(f"Legacy model loaded. Expects {model.n_features_in_} features. Using hardcoded scaler.")
+    except Exception as e:
+        print(f"Error loading legacy model: {e}")
+
+if model is None:
+    print("WARNING: No model file found.")
+
 
 @app.route('/')
 def home():
     return render_template('index.html')
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -56,27 +69,34 @@ def predict():
             float(data.get('age', 0))
         ]])
 
-        # Replace 0 with column mean for fields where 0 is medically impossible
-        for idx, mean_val in ZERO_REPLACE_MEAN.items():
-            if raw[0][idx] == 0:
-                raw[0][idx] = mean_val
-
-        # Scale exactly as done during training
-        scaled = (raw - SCALER_MEAN) / SCALER_STD
+        if scaler is not None:
+            # ── Bundle mode: scaler handles everything automatically ──
+            # Replace 0 with NaN then use scaler's mean for imputation
+            zero_cols = [1, 2, 3, 4, 5]  # glucose, bp, skin, insulin, bmi
+            for col in zero_cols:
+                if raw[0][col] == 0:
+                    raw[0][col] = scaler.mean_[col]
+            scaled = scaler.transform(raw)
+        else:
+            # ── Legacy mode: hardcoded scaler values ──
+            for idx, mean_val in LEGACY_ZERO_REPLACE.items():
+                if raw[0][idx] == 0:
+                    raw[0][idx] = mean_val
+            scaled = (raw - LEGACY_MEAN) / LEGACY_STD
 
         prediction = model.predict(scaled)[0]
 
         try:
             probability = model.predict_proba(scaled)[0]
-            confidence = float(max(probability)) * 100
+            confidence  = float(max(probability)) * 100
         except Exception:
             confidence = None
 
         result = {
-            'prediction': int(prediction),
+            'prediction':      int(prediction),
             'prediction_text': 'Diabetes Detected' if prediction == 1 else 'No Diabetes Detected',
-            'confidence': confidence,
-            'patient_name': data.get('patient_name', '').strip(),
+            'confidence':      confidence,
+            'patient_name':    data.get('patient_name', '').strip(),
             'inputs': {
                 'pregnancies':    float(raw[0][0]),
                 'glucose':        float(raw[0][1]),
@@ -93,13 +113,17 @@ def predict():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+
 @app.route('/info', methods=['GET'])
 def info():
+    mode = 'bundle (scaler included)' if scaler is not None else 'legacy (hardcoded scaler)'
     return jsonify({
         'model_type': 'KNN Diabetes Prediction Model',
+        'mode': mode,
         'features': ['Pregnancies', 'Glucose', 'Blood Pressure',
                      'Skin Thickness', 'Insulin', 'BMI', 'Age']
     })
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
