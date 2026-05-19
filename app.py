@@ -5,6 +5,11 @@ import os
 
 app = Flask(__name__)
 
+# ── Scaler parameters (Pima Indians Diabetes dataset stats) ──
+# These match exactly what was used when the KNN model was trained in Colab
+SCALER_MEAN = np.array([3.845, 120.89, 69.10, 20.54, 79.80, 31.99, 33.24])
+SCALER_STD  = np.array([3.369,  31.97, 19.35, 15.95, 115.24,  7.88, 11.76])
+
 # Load the trained model
 model_path = 'pickel_model.pkl'
 try:
@@ -21,19 +26,6 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """
-    Predict diabetes based on 7 input features (pedigree removed).
-    Expected JSON:
-    {
-        "pregnancies": float,
-        "glucose": float,
-        "blood_pressure": float,
-        "skin_thickness": float,
-        "insulin": float,
-        "bmi": float,
-        "age": float
-    }
-    """
     try:
         if model is None:
             return jsonify({'error': 'Model not loaded'}), 500
@@ -42,8 +34,8 @@ def predict():
         if not data:
             return jsonify({'error': 'No data received'}), 400
 
-        # 7 features — pedigree excluded
-        features = [
+        # 7 features — diabetes pedigree excluded
+        raw = np.array([[
             float(data.get('pregnancies', 0)),
             float(data.get('glucose', 0)),
             float(data.get('blood_pressure', 0)),
@@ -51,13 +43,15 @@ def predict():
             float(data.get('insulin', 0)),
             float(data.get('bmi', 0)),
             float(data.get('age', 0))
-        ]
+        ]])
 
-        features_array = np.array([features])
-        prediction = model.predict(features_array)[0]
+        # Scale exactly as done during training
+        scaled = (raw - SCALER_MEAN) / SCALER_STD
+
+        prediction = model.predict(scaled)[0]
 
         try:
-            probability = model.predict_proba(features_array)[0]
+            probability = model.predict_proba(scaled)[0]
             confidence = float(max(probability)) * 100
         except Exception:
             confidence = None
@@ -67,13 +61,13 @@ def predict():
             'prediction_text': 'Diabetes Detected' if prediction == 1 else 'No Diabetes Detected',
             'confidence': confidence,
             'inputs': {
-                'pregnancies':    features[0],
-                'glucose':        features[1],
-                'blood_pressure': features[2],
-                'skin_thickness': features[3],
-                'insulin':        features[4],
-                'bmi':            features[5],
-                'age':            features[6]
+                'pregnancies':    float(raw[0][0]),
+                'glucose':        float(raw[0][1]),
+                'blood_pressure': float(raw[0][2]),
+                'skin_thickness': float(raw[0][3]),
+                'insulin':        float(raw[0][4]),
+                'bmi':            float(raw[0][5]),
+                'age':            float(raw[0][6])
             }
         }
 
