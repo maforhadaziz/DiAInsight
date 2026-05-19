@@ -59,11 +59,16 @@ function validateForm() {
     const inputs = document.getElementById('predictionForm').querySelectorAll('input[required]');
     let ok = true;
     inputs.forEach(inp => {
-        const v = parseFloat(inp.value);
-        if (inp.value.trim() === '' || isNaN(v) || v < 0) { inp.classList.add('error'); ok = false; }
-        else inp.classList.remove('error');
+        if (inp.type === 'text') {
+            if (inp.value.trim() === '') { inp.classList.add('error'); ok = false; }
+            else inp.classList.remove('error');
+        } else {
+            const v = parseFloat(inp.value);
+            if (inp.value.trim() === '' || isNaN(v) || v < 0) { inp.classList.add('error'); ok = false; }
+            else inp.classList.remove('error');
+        }
     });
-    if (!ok) showError('Please fill in all fields with valid non-negative values.');
+    if (!ok) showError('Please fill in all fields with valid values.');
     return ok;
 }
 
@@ -126,6 +131,9 @@ function displayResult(r) {
     const emoji = pos ? '⚠️' : '✅';
     const title = r.prediction_text || (pos ? 'Diabetes Detected' : 'No Diabetes Detected');
     const sub = pos ? 'Your health data indicates elevated diabetes risk.' : 'Your health data shows no significant diabetes risk.';
+    const name = r.patient_name || '';
+    const nameDisplay = name ? `<span style="font-size:15px;font-weight:500;opacity:.8;display:block;margin-bottom:6px;">Patient: <strong>${name}</strong></span>` : '';
+    const now = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
 
     let confHTML = '';
     if (r.confidence != null) {
@@ -144,8 +152,15 @@ function displayResult(r) {
         <div class="tips-grid">${renderTips(buildTips(r.inputs, pos))}</div>
     </div>` : '';
 
+    const printHeader = `<div class="print-header" style="margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #6366f1;">
+        <h1 style="font-size:22px;font-weight:800;color:#6366f1;margin-bottom:4px;">DiAInsight — Diabetes Risk Report</h1>
+        <p style="font-size:13px;color:#555;">Patient: <strong>${name}</strong> &nbsp;|&nbsp; Date: ${now}</p>
+    </div>`;
+
     document.getElementById('result').innerHTML = `
+        ${printHeader}
         <div class="result-card ${cls}">
+            ${nameDisplay}
             <span class="result-emoji">${emoji}</span>
             <h2 class="result-title">${title}</h2>
             <p class="result-subtitle">${sub}</p>

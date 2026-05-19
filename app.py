@@ -76,6 +76,7 @@ def predict():
             'prediction': int(prediction),
             'prediction_text': 'Diabetes Detected' if prediction == 1 else 'No Diabetes Detected',
             'confidence': confidence,
+            'patient_name': data.get('patient_name', '').strip(),
             'inputs': {
                 'pregnancies':    float(raw[0][0]),
                 'glucose':        float(raw[0][1]),
